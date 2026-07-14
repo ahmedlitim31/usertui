@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"fmt"
-
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -17,7 +15,6 @@ type AppContext struct {
 	BodyPages  *tview.Pages
 	CurrentTab int
 	UsersPanel *UsersTabPanel
-	DebugView  *tview.TextView
 }
 
 func NewApp() *AppContext {
@@ -72,24 +69,15 @@ func (ctx *AppContext) setupLayout() {
 		ctx.TabVisuals()
 	})
 
-	ctx.DebugView = tview.NewTextView().
-		SetTextColor(tcell.ColorRed)
-	ctx.DebugView.SetBackgroundColor(tcell.ColorBlack)
-	ctx.DebugView.SetText(" [WAITING FOR KEY] ")
-
 	// RETRO FIX: Keep the entire header backdrop flat black
-	ctx.HeaderTabs.SetBackgroundColor(tcell.ColorBlack)
 	ctx.HeaderTabs.
-		AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorBlack), 1, 0, false).
+		AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorBlack), 0, 0, false).
 		AddItem(ctx.UsersBtn, 9, 0, true).
-		AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorBlack), 2, 0, false).
-		AddItem(ctx.GroupsBtn, 10, 0, false).
-		AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorBlack), 0, 1, false).
-		AddItem(ctx.DebugView, 45, 0, false)
+		AddItem(tview.NewBox().SetBackgroundColor(tcell.ColorRed), 0, 0, false).
+		AddItem(ctx.GroupsBtn, 10, 0, false)
 
 	ctx.InnerFlex.AddItem(ctx.HeaderTabs, 1, 1, true)
 	ctx.InnerFlex.AddItem(ctx.BodyPages, 0, 1, false)
-	ctx.InnerFlex.SetBackgroundColor(tcell.ColorBlack)
 
 	ctx.MainGrid.
 		SetColumns(0, 70, 0).
@@ -121,43 +109,25 @@ func (ctx *AppContext) TabVisuals() {
 	applyRetroStyle(ctx.UsersBtn, ctx.CurrentTab == 0)
 	applyRetroStyle(ctx.GroupsBtn, ctx.CurrentTab == 1)
 
-	// Hand off operational focus to the active tab component
 	if ctx.CurrentTab == 0 {
-		ctx.App.SetFocus(ctx.UsersBtn)
+		if ctx.UsersPanel != nil && ctx.UsersPanel.List != nil {
+			ctx.App.SetFocus(ctx.UsersPanel.List)
+			ctx.UsersPanel.List.SetCurrentItem(0) // Reset to first item
+		}
 	} else {
+
 		ctx.App.SetFocus(ctx.GroupsBtn)
 	}
 }
 func (ctx *AppContext) setupKeybindings() {
 	ctx.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		currentFocus := ctx.App.GetFocus()
-
-		// 🔍 LIVE DEBUG MONITORING
-		focusStr := "NIL"
-		if currentFocus != nil {
-			focusStr = fmt.Sprintf("%T", currentFocus)
-		}
-		keyName := tcell.KeyNames[event.Key()]
-		ctx.DebugView.SetText(fmt.Sprintf(" [F-PRE: %s | K: %s] ", focusStr, keyName))
-
 		// 1. If the user is viewing the Users tab panel layout
 		if ctx.CurrentTab == 0 && ctx.UsersPanel != nil {
 			proceedBtn := ctx.UsersPanel.Buttons.GetItem(1)
 			cancelBtn := ctx.UsersPanel.Buttons.GetItem(3)
 			currIdx := ctx.UsersPanel.List.GetCurrentItem()
 			maxIdx := ctx.UsersPanel.List.GetItemCount() - 1
-			// Route Down arrow away from the List onto the Proceed button
-			if event.Key() == tcell.KeyDown {
-				if currentFocus == ctx.UsersPanel.List {
-					if currIdx == maxIdx {
-						ctx.App.SetFocus(proceedBtn)
-						return nil
-					} else if currIdx%2 == 0 {
-						ctx.UsersPanel.List.SetCurrentItem(currIdx + 2)
-						return nil
-					}
-				}
-			}
 
 			// Fix 3: Intercept Up arrow actions on empty spacer lines
 			if event.Key() == tcell.KeyUp {
@@ -172,6 +142,18 @@ func (ctx *AppContext) setupKeybindings() {
 					ctx.UsersPanel.List.SetCurrentItem(maxIdx)
 					ctx.App.SetFocus(ctx.UsersPanel.List)
 					return nil
+				}
+			}
+			// Route Down arrow away from the List onto the Proceed button
+			if event.Key() == tcell.KeyDown {
+				if currentFocus == ctx.UsersPanel.List {
+					if currIdx == maxIdx {
+						ctx.App.SetFocus(proceedBtn)
+						return nil
+					} else if currIdx%2 == 0 {
+						ctx.UsersPanel.List.SetCurrentItem(currIdx + 2)
+						return nil
+					}
 				}
 			}
 
@@ -191,23 +173,10 @@ func (ctx *AppContext) setupKeybindings() {
 			ctx.CurrentTab = (ctx.CurrentTab + 1) % 2
 			if ctx.CurrentTab == 0 {
 				ctx.BodyPages.SwitchToPage("users")
-
-				if ctx.UsersPanel != nil && ctx.UsersPanel.List != nil {
-					ctx.UsersPanel.List.SetCurrentItem(0)
-					ctx.App.SetFocus(ctx.UsersPanel.MainFlex)
-				}
 			} else {
 				ctx.BodyPages.SwitchToPage("groups")
-				ctx.App.SetFocus(ctx.GroupsBtn)
 			}
 			ctx.TabVisuals()
-			// Post-switch focus validation: see if tview accepted our focus request
-			postFocus := ctx.App.GetFocus()
-			postFocusStr := "NIL"
-			if postFocus != nil {
-				postFocusStr = fmt.Sprintf("%T", postFocus)
-			}
-			ctx.DebugView.SetText(fmt.Sprintf(" [TAB SWAP -> F-POST: %s] ", postFocusStr))
 			return nil
 		}
 
