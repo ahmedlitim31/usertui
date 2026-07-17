@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"usertui/components"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -311,7 +313,15 @@ func (ctx *AppContext) ShowPage(pageName string) {
 	// Create page using registered creator
 	if creator, exists := ctx.pageCreators[pageName]; exists {
 		page := creator()
-		ctx.BodyPages.AddPage(pageName, page, true, true)
+		// Get current tab name
+		tabName := "users"
+		if ctx.CurrentTab == 1 {
+			tabName = "groups"
+		}
+
+		// Wrap the page with breadcrumb using helpers
+		wrappedPage := components.WrapPageWithBreadcrumb(page, tabName, pageName)
+		ctx.BodyPages.AddPage(pageName, wrappedPage, true, true)
 	}
 }
 
