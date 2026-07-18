@@ -314,6 +314,7 @@ func (ctx *AppContext) ShowPage(pageName string) {
 	// Check if page already exists
 	if ctx.BodyPages.HasPage(pageName) {
 		ctx.BodyPages.SwitchToPage(pageName)
+		ctx.App.SetFocus(ctx.BodyPages.GetPage(pageName))
 		return
 	}
 
@@ -328,7 +329,15 @@ func (ctx *AppContext) ShowPage(pageName string) {
 
 		// Wrap the page with breadcrumb using helpers
 		wrappedPage := components.WrapPageWithBreadcrumb(page, tabName, pageName)
-		ctx.BodyPages.AddPage(pageName, wrappedPage, true, true)
+
+		// ✅ Add page without switching
+		ctx.BodyPages.AddPage(pageName, wrappedPage, true, false)
+
+		// ✅ Switch to it
+		ctx.BodyPages.SwitchToPage(pageName)
+
+		// ✅ Set focus
+		ctx.App.SetFocus(wrappedPage)
 	}
 }
 
