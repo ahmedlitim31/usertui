@@ -52,6 +52,7 @@ func (ctx *AppContext) setupLayout() {
 		func() {
 			ctx.App.Stop()
 		},
+		ctx.App,
 	)
 	ctx.GroupsPanel = NewTabPanel("groups",
 		func(actionIdx int) {
@@ -61,6 +62,7 @@ func (ctx *AppContext) setupLayout() {
 		func() {
 			ctx.App.Stop()
 		},
+		ctx.App,
 	)
 	ctx.BodyPages.AddPage("users", ctx.UsersPanel.MainFlex, true, true)
 	ctx.BodyPages.AddPage("groups", ctx.GroupsPanel.MainFlex, true, false)

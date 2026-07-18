@@ -13,6 +13,9 @@ type TabPanel struct {
 	Buttons     *tview.Flex
 	ConfirmedId int
 	PanelType   string
+	App         *tview.Application
+	ProceedBtn  *tview.Button
+	CancelBtn   *tview.Button
 }
 
 type PanelConfig struct {
@@ -20,7 +23,7 @@ type PanelConfig struct {
 	Options []string
 }
 
-func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func()) *TabPanel {
+func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func(), app *tview.Application) *TabPanel {
 	config := getPanelConfig(panelType)
 	panel := &TabPanel{
 		MainFlex:    tview.NewFlex().SetDirection(tview.FlexRow),
@@ -28,6 +31,7 @@ func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func(
 		Buttons:     tview.NewFlex().SetDirection(tview.FlexColumn),
 		ConfirmedId: 0,
 		PanelType:   panelType,
+		App:         app,
 	}
 
 	// Helper function to render a line mimicking a retro radio button state
@@ -61,9 +65,15 @@ func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func(
 			for i, opt := range config.Options {
 				panel.List.SetItemText(i*2, getOptionLabel(i, opt), "")
 			}
+			if onProceed != nil {
+				onProceed(panel.ConfirmedId)
+			}
 		}
 	})
-
+	proceedBtn := tview.NewButton("< Proceed to Action >")
+	cancelBtn := tview.NewButton("< Cancel >")
+	panel.ProceedBtn = proceedBtn
+	panel.CancelBtn = cancelBtn
 	// Capture spacebar cleanly inside the list box
 	panel.List.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Rune() == ' ' {
@@ -73,15 +83,22 @@ func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func(
 				for i, opt := range config.Options {
 					panel.List.SetItemText(i*2, getOptionLabel(i, opt), "")
 				}
+
+				// ✅ Use stored buttons
+				if panel.App != nil {
+					currentFocus := panel.App.GetFocus()
+
+					if currentFocus == panel.List {
+						panel.App.SetFocus(panel.ProceedBtn) // Go to button
+					} else if currentFocus == panel.ProceedBtn {
+						panel.App.SetFocus(panel.List) // Go back to list
+					}
+				}
 			}
 			return nil
 		}
 		return event
 	})
-
-	// Setup retro button controls at the bottom
-	proceedBtn := tview.NewButton("< Proceed to Action >")
-	cancelBtn := tview.NewButton("< Cancel >")
 
 	proceedBtn.SetSelectedFunc(func() {
 		if onProceed != nil {
@@ -93,7 +110,28 @@ func NewTabPanel(panelType string, onProceed func(actionIdx int), onCancel func(
 			onCancel()
 		}
 	})
+	proceedBtn.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Rune() == ' ' {
+			// Space on proceed button → jump back to list
+			if panel.App != nil {
+				panel.App.SetFocus(panel.List)
+			}
+			return nil
+		}
+		return event
+	})
 
+	// Also add to cancel button if you want consistent behavior
+	cancelBtn.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Rune() == ' ' {
+			// Space on cancel button → jump back to list
+			if panel.App != nil {
+				panel.App.SetFocus(panel.List)
+			}
+			return nil
+		}
+		return event
+	})
 	// Configure Retro Color Themes
 	panel.List.SetBackgroundColor(tcell.ColorBlack)
 	panel.List.SetMainTextColor(tcell.ColorDarkGreen)
